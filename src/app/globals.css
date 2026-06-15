@@ -1,0 +1,197 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;850&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #F5F7FB;
+  --foreground: #111827;
+
+  --card: #ffffff;
+  --card-foreground: #111827;
+
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+
+  --primary: #7C5CFF; /* Modern Purple */
+  --primary-foreground: #ffffff;
+
+  --secondary: #F3F4F6;
+  --secondary-foreground: #111827;
+
+  --muted: #F9FAFB;
+  --muted-foreground: #6B7280;
+
+  --accent: #0284C7; /* Calm Sky Blue (reducing neon saturated colors in light mode) */
+  --accent-foreground: #ffffff;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #7C5CFF;
+
+  --radius: 0.75rem;
+  
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.dark {
+  --background: #0B1020; /* Deep Futuristic Blue */
+  --foreground: #F1F5F9;
+
+  --card: #151B2E; /* Dark Surface */
+  --card-foreground: #F1F5F9;
+
+  --popover: #151B2E;
+  --popover-foreground: #F1F5F9;
+
+  --primary: #7C5CFF; /* Primary Accent */
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #1F293D; /* Muted Blue-Gray Surface */
+  --secondary-foreground: #F1F5F9;
+
+  --muted: #1A2338;
+  --muted-foreground: #94A3B8;
+
+  --accent: #00D4FF; /* Secondary Accent */
+  --accent-foreground: #0B1020;
+
+  --destructive: #EF4444; /* Danger */
+  --destructive-foreground: #ffffff;
+
+  --border: #232C42; /* Custom Dark Accent Border */
+  --input: #232C42;
+  --ring: #7C5CFF;
+}
+
+@theme {
+  --font-orbitron: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.035) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.035) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, rgba(99, 102, 241, 0.015) 0px, transparent 50%);
+    background-attachment: fixed;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* Custom Premium Card Shadows & Glow Effects */
+.bg-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01), 0 8px 30px -8px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bg-card:hover {
+  box-shadow: 0 12px 30px -10px rgba(99, 102, 241, 0.07), 0 30px 60px -20px rgba(0, 0, 0, 0.02);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.dark .bg-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 30px -8px rgba(0, 0, 0, 0.3);
+}
+
+.dark .bg-card:hover {
+  box-shadow: 0 12px 30px -10px rgba(129, 140, 248, 0.12), 0 30px 60px -20px rgba(0, 0, 0, 0.4);
+  border-color: rgba(129, 140, 248, 0.25);
+}
+
+/* Premium Custom Utilities */
+@utility glass {
+  background: rgba(24, 24, 27, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@utility glass-light {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+@utility text-glow-indigo {
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+/* Custom Scrollbar for modern web apps */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Shimmer animation for loading skeletons */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.dark .shimmer {
+  background: linear-gradient(90deg, #18181b 25%, #27272a 50%, #18181b 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
