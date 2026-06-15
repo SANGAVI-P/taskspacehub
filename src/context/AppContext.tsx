@@ -93,28 +93,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         document.documentElement.classList.remove('dark');
       }
-
-      const storedLogs = localStorage.getItem('task-logs');
-      if (storedLogs) {
-        setLogs(JSON.parse(storedLogs));
-      } else {
-        setLogs(INITIAL_LOGS);
-        localStorage.setItem('task-logs', JSON.stringify(INITIAL_LOGS));
-      }
-
-      const storedNotifs = localStorage.getItem('task-notifications');
-      if (storedNotifs) {
-        setNotifications(JSON.parse(storedNotifs));
-      } else {
-        setNotifications(INITIAL_NOTIFICATIONS);
-        localStorage.setItem('task-notifications', JSON.stringify(INITIAL_NOTIFICATIONS));
-      }
     } catch (error) {
       console.error(error);
     }
   }, []);
 
-  // Load XP and Streak on user change
+  // Load XP, Streak, Notifications, and Logs on user change
   useEffect(() => {
     if (user) {
       const storedXP = localStorage.getItem(`task-xp-${user.id}`);
@@ -123,10 +107,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUserXP(storedXP ? parseInt(storedXP) : 0);
       setStreakCount(storedStreak ? parseInt(storedStreak) : 0);
       setBestStreak(storedBest ? parseInt(storedBest) : 0);
+
+      const storedNotifs = localStorage.getItem(`task-notifications-${user.id}`);
+      if (storedNotifs) {
+        setNotifications(JSON.parse(storedNotifs));
+      } else {
+        setNotifications(INITIAL_NOTIFICATIONS);
+        localStorage.setItem(`task-notifications-${user.id}`, JSON.stringify(INITIAL_NOTIFICATIONS));
+      }
+
+      const storedLogs = localStorage.getItem(`task-logs-${user.id}`);
+      if (storedLogs) {
+        setLogs(JSON.parse(storedLogs));
+      } else {
+        setLogs(INITIAL_LOGS);
+        localStorage.setItem(`task-logs-${user.id}`, JSON.stringify(INITIAL_LOGS));
+      }
     } else {
       setUserXP(0);
       setStreakCount(0);
       setBestStreak(0);
+      setNotifications([]);
+      setLogs([]);
     }
   }, [user]);
 
@@ -159,7 +161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTimeout(() => {
           setLogs((prev) => {
             const nextLogs = [newLog, ...prev];
-            localStorage.setItem('task-logs', JSON.stringify(nextLogs));
+            localStorage.setItem(`task-logs-${user.id}`, JSON.stringify(nextLogs));
             return nextLogs;
           });
         }, 0);
@@ -209,6 +211,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items.forEach((task) => {
         if (task.status === 'completed' || task.status === 'submitted') return;
 
+        // Skip sending notifications if this task is assigned to someone else
+        if (task.assignee && task.assignee.id !== user.id) return;
+
         const due = new Date(task.dueDate);
         const diffTime = due.getTime() - now.getTime();
         const diffDays = diffTime / (1000 * 60 * 60 * 24);
@@ -254,7 +259,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       if (hasNewNotifs) {
-        localStorage.setItem('task-notifications', JSON.stringify(updatedNotifs));
+        localStorage.setItem(`task-notifications-${user.id}`, JSON.stringify(updatedNotifs));
       }
       return updatedNotifs;
     });
@@ -370,7 +375,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTasks(nextTasks);
       }
 
-      // Notification if assigned to another user
+      // Notification if assigned to another user (send directly to their inbox)
       if (newTask.assignee && newTask.assignee.id !== user.id) {
         const newNotif: Notification = {
           id: 'n-' + Math.random().toString(36).substring(2, 9),
@@ -380,13 +385,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           read: false,
           type: 'task_assigned',
         };
-        setTimeout(() => {
-          setNotifications((prev) => {
-            const nextNotifs = [newNotif, ...prev];
-            localStorage.setItem('task-notifications', JSON.stringify(nextNotifs));
-            return nextNotifs;
-          });
-        }, 0);
+        const assigneeKey = `task-notifications-${newTask.assignee.id}`;
+        const assigneeStored = localStorage.getItem(assigneeKey) || '[]';
+        let assigneeNotifs = [];
+        try {
+          assigneeNotifs = JSON.parse(assigneeStored);
+        } catch (e) {
+          assigneeNotifs = [];
+        }
+        localStorage.setItem(assigneeKey, JSON.stringify([newNotif, ...assigneeNotifs]));
       }
 
       // Log activity
@@ -415,7 +422,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const updatedLogs = [...logsToSave, ...logs];
       setLogs(updatedLogs);
-      localStorage.setItem('task-logs', JSON.stringify(updatedLogs));
+      localStorage.setItem(`task-logs-${user.id}`, JSON.stringify(updatedLogs));
+
+      // Copy log to assignee's activity logs
+      if (newTask.assignee && newTask.assignee.id !== user.id) {
+        const assigneeKey = `task-logs-${newTask.assignee.id}`;
+        const assigneeStored = localStorage.getItem(assigneeKey) || '[]';
+        let assigneeLogs = [];
+        try {
+          assigneeLogs = JSON.parse(assigneeStored);
+        } catch (e) {
+          assigneeLogs = [];
+        }
+        localStorage.setItem(assigneeKey, JSON.stringify([...logsToSave, ...assigneeLogs]));
+      }
 
       showToast(isFirebaseConfigured ? 'Task saved to Firestore' : 'Task created in Sandbox', 'success');
     } catch (error) {
@@ -552,13 +572,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               read: false,
               type: 'system',
             };
-            setTimeout(() => {
-              setNotifications((prev) => {
-                const nextNotifs = [newNotif, ...prev];
-                localStorage.setItem('task-notifications', JSON.stringify(nextNotifs));
-                return nextNotifs;
-              });
-            }, 0);
+            
+            // Send notification to both creator and assignee
+            const recipients = new Set<string>();
+            if (oldTask.creatorId) recipients.add(oldTask.creatorId);
+            if (oldTask.assignee?.id) recipients.add(oldTask.assignee.id);
+
+            recipients.forEach((recipientId) => {
+              const key = `task-notifications-${recipientId}`;
+              const stored = localStorage.getItem(key) || '[]';
+              let notifs = [];
+              try {
+                notifs = JSON.parse(stored);
+              } catch (e) {
+                notifs = [];
+              }
+              const updated = [newNotif, ...notifs];
+              localStorage.setItem(key, JSON.stringify(updated));
+              if (recipientId === user.id) {
+                setNotifications(updated);
+              }
+            });
           } else if (updatedTask.status === 'expired') {
             actionStr = `Task Expired`;
             if (user) {
@@ -598,13 +632,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               read: false,
               type: 'task_assigned',
             };
-            setTimeout(() => {
-              setNotifications((prev) => {
-                const nextNotifs = [newNotif, ...prev];
-                localStorage.setItem('task-notifications', JSON.stringify(nextNotifs));
-                return nextNotifs;
-              });
-            }, 0);
+            const assigneeId = updatedTask.assignee.id;
+            const key = `task-notifications-${assigneeId}`;
+            const stored = localStorage.getItem(key) || '[]';
+            let notifs = [];
+            try {
+              notifs = JSON.parse(stored);
+            } catch (e) {
+              notifs = [];
+            }
+            const updated = [newNotif, ...notifs];
+            localStorage.setItem(key, JSON.stringify(updated));
+            if (assigneeId === user.id) {
+              setNotifications(updated);
+            }
           }
         }
         
@@ -635,7 +676,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (logsToSave.length > 0) {
           const updatedLogs = [...logsToSave, ...logs];
           setLogs(updatedLogs);
-          localStorage.setItem('task-logs', JSON.stringify(updatedLogs));
+          localStorage.setItem(`task-logs-${user.id}`, JSON.stringify(updatedLogs));
+
+          // Share log to assignee/creator if they are different from current user
+          const partnerId = (updatedTask.assignee?.id || oldTask.assignee?.id) !== user.id 
+            ? (updatedTask.assignee?.id || oldTask.assignee?.id)
+            : (oldTask.creatorId !== user.id ? oldTask.creatorId : null);
+
+          if (partnerId) {
+            const partnerKey = `task-logs-${partnerId}`;
+            const partnerStored = localStorage.getItem(partnerKey) || '[]';
+            let partnerLogs = [];
+            try {
+              partnerLogs = JSON.parse(partnerStored);
+            } catch (e) {
+              partnerLogs = [];
+            }
+            localStorage.setItem(partnerKey, JSON.stringify([...logsToSave, ...partnerLogs]));
+          }
         }
       }
 
@@ -678,7 +736,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       const updatedLogs = [newLog, ...logs];
       setLogs(updatedLogs);
-      localStorage.setItem('task-logs', JSON.stringify(updatedLogs));
+      localStorage.setItem(`task-logs-${user.id}`, JSON.stringify(updatedLogs));
+
+      // Copy log to assignee if different from current user
+      if (targetTask.assignee && targetTask.assignee.id !== user.id) {
+        const assigneeKey = `task-logs-${targetTask.assignee.id}`;
+        const assigneeStored = localStorage.getItem(assigneeKey) || '[]';
+        let assigneeLogs = [];
+        try {
+          assigneeLogs = JSON.parse(assigneeStored);
+        } catch (e) {
+          assigneeLogs = [];
+        }
+        localStorage.setItem(assigneeKey, JSON.stringify([newLog, ...assigneeLogs]));
+      }
 
       showToast(isFirebaseConfigured ? 'Task deleted from database' : 'Task removed from Sandbox', 'success');
     } catch (error) {
@@ -689,15 +760,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markNotificationRead = (id: string) => {
+    if (!user) return;
     const updatedNotifs = notifications.map(n => n.id === id ? { ...n, read: true } : n);
     setNotifications(updatedNotifs);
-    localStorage.setItem('task-notifications', JSON.stringify(updatedNotifs));
+    localStorage.setItem(`task-notifications-${user.id}`, JSON.stringify(updatedNotifs));
   };
 
   const markAllNotificationsRead = () => {
+    if (!user) return;
     const updatedNotifs = notifications.map(n => ({ ...n, read: true }));
     setNotifications(updatedNotifs);
-    localStorage.setItem('task-notifications', JSON.stringify(updatedNotifs));
+    localStorage.setItem(`task-notifications-${user.id}`, JSON.stringify(updatedNotifs));
     showToast('All notifications marked as read', 'info');
   };
 
